@@ -23,6 +23,9 @@ WORKDIR /app
 RUN apk add --no-cache openssl
 ENV NODE_ENV=production
 ENV PORT=3000
+# Bind to all interfaces so Railway/other hosts can reach the standalone server
+# (Next's standalone server otherwise defaults to localhost inside the container).
+ENV HOSTNAME="0.0.0.0"
 
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 
