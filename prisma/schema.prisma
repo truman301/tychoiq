@@ -1,0 +1,499 @@
+// TychoIQ — Prisma schema (PostgreSQL)
+// ----------------------------------------------------------------------------
+// Production datastore is PostgreSQL. The schema is intentionally conservative
+// (no native enums/array columns; structured data stored as JSON strings via
+// lib/json.ts) so it also runs on SQLite for quick local dev if desired.
+// Embeddings are stored as JSON number arrays; similarity is computed in TS.
+//
+// pgvector upgrade (optional): add a `vector` column + index for
+// `TrainingExample.embedding` and `Candidate.embedding` and swap the in-TS
+// cosine search for a SQL `<=>` nearest-neighbour query. See README.
+// ----------------------------------------------------------------------------
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String?
+  createdAt    DateTime @default(now())
+
+  memberships WorkspaceMember[]
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+
+  members    WorkspaceMember[]
+  projects   Project[]
+  connectors SourceConnector[]
+  auditLogs  AuditLog[]
+}
+
+model WorkspaceMember {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        String   @default("admin") // admin | editor | viewer
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+}
+
+// Catalogue of available project templates (built-ins seeded from lib/templates.ts).
+model ProjectTemplate {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  name        String
+  description String
+  mode        String // general | quinable | pe_ma | local | healthcare | manufacturing | b2b_saas
+  config      String // JSON snapshot of the template's ICP + weights defaults
+  createdAt   DateTime @default(now())
+}
+
+model Project {
+  id               String   @id @default(cuid())
+  workspaceId      String
+  name             String
+  description      String?
+  industry         String?
+  geographySummary String?
+  templateKey      String?
+  mode             String   @default("general")
+  status           String   @default("draft") // draft | training | ready | scanning | archived
+
+  // Training-gate configuration (section 2.3 / 9)
+  minPositiveLabels   Int @default(20)
+  minNegativeLabels   Int @default(20)
+  minReviewed         Int @default(30)
+  validationThreshold Int @default(75) // precision % required to unlock large scans
+
+  modelApproved Boolean @default(false)
+  scanUnlocked  Boolean @default(false)
+
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspace      Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  icp            ICPDefinition?
+  candidates     Candidate[]
+  scanRuns       ScanRun[]
+  trainingEx     TrainingExample[]
+  modelSnapshots TrainingModelSnapshot[]
+  exports        ExportJob[]
+  savedLists     SavedList[]
+
+  @@index([workspaceId])
+}
+
+model ICPDefinition {
+  id                String   @id @default(cuid())
+  projectId         String   @unique
+  targetDescription String?
+
+  // All structured fields stored as JSON strings (portable).
+  geography                String? // { states, counties, cities, zips, radius, polygons }
+  organizationTypesInclude String? // string[]
+  organizationTypesExclude String? // string[]
+  optionalCategories       String? // string[]
+  sizeSignals              String? // { minLocations, preferredLocations, minEmployees, maxEmployees, ... }
+  buyerPersonaTitles       String? // string[]
+  painSignals              String? // string[]
+  triggerEvents            String? // string[]
+  qualitySignals           String? // string[]
+  riskSignals              String? // string[]
+  sourcePreferences        String? // string[] connector keys
+  requiredEvidenceFields   String? // string[]
+  scoringWeights           String? // { fit: {...}, risk: {...} }
+
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model SourceConnector {
+  id          String   @id @default(cuid())
+  workspaceId String
+  key         String // brave_search | google_places | osm_overpass | cms_provider | nppes | website_crawl | csv_import | manual
+  name        String
+  category    String // search | maps | gov | crawl | import | enrichment
+  enabled     Boolean  @default(false)
+  mock        Boolean  @default(true)
+  config      String? // JSON
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, key])
+}
+
+model ScanRun {
+  id             String    @id @default(cuid())
+  projectId      String
+  type           String    @default("sample") // sample | large
+  status         String    @default("queued") // queued | running | completed | failed | cancelled
+  params         String? // JSON: regions, source limits, maxCandidates
+  regionSummary  String?
+  connectorsUsed String? // JSON string[]
+  counts         String? // JSON: { discovered, deduped, enriched, scored, queuedForReview, saved }
+  error          String?
+  createdBy      String?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime  @default(now())
+
+  project    Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sourceRuns SourceRun[]
+  logs       ScanRunLog[]
+  candidates Candidate[]
+
+  @@index([projectId])
+}
+
+model ScanRunLog {
+  id        String   @id @default(cuid())
+  scanRunId String
+  level     String   @default("info") // info | warn | error
+  stage     String
+  message   String
+  meta      String? // JSON
+  createdAt DateTime @default(now())
+
+  scanRun ScanRun @relation(fields: [scanRunId], references: [id], onDelete: Cascade)
+
+  @@index([scanRunId])
+}
+
+model SourceRun {
+  id           String    @id @default(cuid())
+  scanRunId    String
+  connectorKey String
+  status       String    @default("running") // running | completed | failed
+  recordCount  Int       @default(0)
+  error        String?
+  startedAt    DateTime  @default(now())
+  completedAt  DateTime?
+
+  scanRun ScanRun           @relation(fields: [scanRunId], references: [id], onDelete: Cascade)
+  records RawSourceRecord[]
+
+  @@index([scanRunId])
+}
+
+model RawSourceRecord {
+  id          String   @id @default(cuid())
+  sourceRunId String
+  candidateId String?
+
+  sourceType  String
+  sourceName  String
+  sourceUrl   String?
+  retrievedAt DateTime @default(now())
+
+  rawTitle String?
+  rawText  String?
+  rawJson  String? // JSON
+
+  organizationName String?
+  website          String?
+  phone            String?
+  email            String?
+  address          String?
+  city             String?
+  state            String?
+  postalCode       String?
+  country          String?
+  latitude         Float?
+  longitude        Float?
+  externalIds      String? // JSON: { npi, ccn, placeId, ... }
+
+  createdAt DateTime @default(now())
+
+  sourceRun SourceRun  @relation(fields: [sourceRunId], references: [id], onDelete: Cascade)
+  candidate Candidate? @relation(fields: [candidateId], references: [id], onDelete: SetNull)
+
+  @@index([sourceRunId])
+  @@index([candidateId])
+}
+
+model Candidate {
+  id        String  @id @default(cuid())
+  projectId String
+  scanRunId String?
+
+  name           String
+  normalizedName String
+  website        String?
+  domain         String?
+  organizationType String?
+  description      String?
+
+  facilityCountEstimate Int?
+  employeeCountEstimate Int?
+  revenueEstimate       String?
+  ownershipType         String?
+  parentCompany         String?
+
+  // Dedupe keys
+  phoneKey   String?
+  addressKey String?
+  npi        String?
+  ccn        String? // CMS Certification Number
+  placeId    String?
+
+  // Healthcare/Quinable-specific (nullable for general projects)
+  bedCount       Int?
+  starRating     Float?
+  staffingSummary String? // JSON summary of PBJ staffing proxy
+
+  // Structured arrays (JSON strings)
+  services      String? // string[]
+  targetUseCases String? // string[]
+  painSignals   String? // Signal[]
+  qualitySignals String? // Signal[]
+  riskSignals   String? // Signal[]
+  triggerEvents String? // Signal[]
+
+  // Outreach
+  recommendedTitles String? // string[]
+  outreachAngle     String?
+
+  // Embedding for similarity (JSON number[])
+  embedding String?
+
+  status        String  @default("new") // new | needs_review | reviewed | contacted | archived
+  priorityTier  String? // high | medium | low | avoid
+  reviewed      Boolean @default(false)
+  contacted     Boolean @default(false)
+  notes         String?
+
+  lastVerifiedAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  project    Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  scanRun    ScanRun?            @relation(fields: [scanRunId], references: [id], onDelete: SetNull)
+  locations  CandidateLocation[]
+  evidence   CandidateEvidence[]
+  contacts   CandidateContact[]
+  scores     CandidateScore[]
+  labels     CandidateLabel[]
+  rawRecords RawSourceRecord[]
+  listItems  SavedListCandidate[]
+
+  @@index([projectId])
+  @@index([scanRunId])
+  @@index([projectId, domain])
+  @@index([projectId, normalizedName])
+}
+
+model CandidateLocation {
+  id             String  @id @default(cuid())
+  candidateId    String
+  label          String?
+  address        String?
+  city           String?
+  state          String?
+  postalCode     String?
+  country        String?
+  latitude       Float?
+  longitude      Float?
+  isHeadquarters Boolean @default(false)
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+}
+
+model CandidateEvidence {
+  id          String   @id @default(cuid())
+  candidateId String
+  field       String // which field/claim this evidence supports
+  sourceName  String
+  sourceType  String
+  url         String?
+  retrievedAt DateTime @default(now())
+  snippet     String?
+  confidence  String   @default("medium") // low | medium | high
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+}
+
+model CandidateContact {
+  id          String  @id @default(cuid())
+  candidateId String
+  name        String?
+  title       String?
+  email       String?
+  phone       String?
+  linkedinUrl String?
+  source      String?
+  confidence  String  @default("medium")
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+}
+
+model CandidateScore {
+  id          String   @id @default(cuid())
+  candidateId String
+
+  fitScore             Int
+  riskScore            Int
+  priorityScore        Int
+  confidence           Float
+  scoreBreakdown       String // JSON Record<string, number>
+  topReasonsToTarget   String // JSON string[]
+  topReasonsToAvoid    String // JSON string[]
+  missingInfo          String // JSON string[]
+  recommendedNextAction String // research | export | label | skip | watch
+
+  modelSnapshotId String?
+  createdAt       DateTime @default(now())
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+}
+
+model CandidateLabel {
+  id          String  @id @default(cuid())
+  candidateId String
+  projectId   String
+
+  label   String // strong_fit | possible_fit | not_a_fit | duplicate | needs_research | risky
+  reasons String? // JSON string[]
+  note    String?
+  source  String  @default("review") // training | review | bulk
+  isHoldout Boolean @default(false) // part of validation holdout set
+
+  createdBy String?
+  createdAt DateTime @default(now())
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+  @@index([projectId])
+}
+
+model TrainingExample {
+  id        String @id @default(cuid())
+  projectId String
+
+  kind      String // positive | negative | gold | bad
+  inputType String // website | name | csv | facility
+  value     String
+  normalizedName String?
+  domain    String?
+  note      String?
+  embedding String? // JSON number[]
+
+  createdBy String?
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model TrainingModelSnapshot {
+  id        String @id @default(cuid())
+  projectId String
+
+  version          Int     @default(1)
+  positiveCentroid String? // JSON number[]
+  negativeCentroid String? // JSON number[]
+  weights          String? // JSON scoring weights snapshot
+  metrics          String? // JSON { precision, recall, f1, falsePositives, falseNegatives, ... }
+  rubric           String? // JSON "Model Understanding" page content
+  approved         Boolean @default(false)
+  approvedBy       String?
+  approvedAt       DateTime?
+
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model ExportJob {
+  id        String @id @default(cuid())
+  projectId String
+
+  format    String // csv | json | clay_csv | quinable_csv
+  filter    String? // JSON
+  status    String  @default("completed") // queued | completed | failed
+  fileName  String
+  content   String? // inline CSV/JSON content for MVP download
+  rowCount  Int     @default(0)
+  error     String?
+
+  createdBy String?
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model SavedList {
+  id          String   @id @default(cuid())
+  projectId   String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+
+  project Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  items   SavedListCandidate[]
+
+  @@index([projectId])
+}
+
+model SavedListCandidate {
+  id          String   @id @default(cuid())
+  savedListId String
+  candidateId String
+  addedAt     DateTime @default(now())
+
+  savedList SavedList @relation(fields: [savedListId], references: [id], onDelete: Cascade)
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@unique([savedListId, candidateId])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  workspaceId String?
+  projectId   String?
+  actor       String?
+  action      String
+  entityType  String?
+  entityId    String?
+  meta        String? // JSON
+  createdAt   DateTime @default(now())
+
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@index([projectId])
+}

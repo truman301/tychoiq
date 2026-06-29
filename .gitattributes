@@ -1,0 +1,12 @@
+# Normalize all text to LF in the repo (required so docker-entrypoint.sh and
+# other scripts work in the Linux production container regardless of OS).
+* text=auto eol=lf
+
+# Binary/asset types that must never be normalized.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
