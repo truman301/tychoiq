@@ -1,5 +1,7 @@
-# TychoIQ production image (multi-stage, Next.js standalone output).
-# Works on Railway, Render, Fly.io, or any container host.
+# TychoIQ production image.
+# Uses the full node_modules at runtime so the Prisma CLI (db push on boot) has
+# all its dependencies, and starts the app with `next start`. Reliable on
+# Railway/Render/Fly/any container host.
 
 # ---- deps ----
 FROM node:22-alpine AS deps
@@ -23,26 +25,11 @@ WORKDIR /app
 RUN apk add --no-cache openssl
 ENV NODE_ENV=production
 ENV PORT=3000
-# Bind to all interfaces so Railway/other hosts can reach the standalone server
-# (Next's standalone server otherwise defaults to localhost inside the container).
-ENV HOSTNAME="0.0.0.0"
+ENV HOSTNAME=0.0.0.0
 
-RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
-
-# Next.js standalone server + static assets
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
-# Prisma needs the schema + generated client + engines + CLI to run migrations on boot
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder /app/docker-entrypoint.sh ./docker-entrypoint.sh
+# Copy the whole built app, including full node_modules (so `prisma` + its deps
+# and `next start` are all available at runtime).
+COPY --from=builder /app ./
 
 EXPOSE 3000
-USER nextjs
-
-# Apply schema then start the server. (For real migration history use `prisma migrate deploy`.)
 CMD ["sh", "docker-entrypoint.sh"]
