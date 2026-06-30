@@ -53,9 +53,11 @@ export default function SettingsPage() {
                     <div className="flex items-center gap-2 text-sm font-medium">
                       {c.name}
                       <Badge tone="secondary">{c.category}</Badge>
-                      {data.mockMode || !hasKey ? <Badge tone="warning">mock</Badge> : <Badge tone="success">live</Badge>}
+                      {data.mockMode || !hasKey ? <Badge tone="warning">Sample data</Badge> : <Badge tone="success">Live</Badge>}
                     </div>
-                    <div className="text-xs text-muted-foreground">key: {c.key}</div>
+                    <div className="mt-0.5 text-xs text-muted-foreground">
+                      {data.mockMode || !hasKey ? "Returning bundled sample results" : "Connected to live source"}
+                    </div>
                   </div>
                   <Button size="sm" variant={c.enabled ? "success" : "outline"} onClick={() => toggle(c.key, !c.enabled)} disabled={busy}>
                     {c.enabled ? "Enabled" : "Disabled"}
@@ -72,10 +74,12 @@ export default function SettingsPage() {
               <CardTitle className="text-base">Providers</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
-              <Row label="Mock mode" value={data.mockMode ? "ON (no keys needed)" : "OFF"} />
-              <Row label="LLM provider" value={data.llmProvider} />
-              <Row label="Embeddings" value={data.embeddingsProvider} />
-              <p className="pt-2 text-xs text-muted-foreground">Configure keys in <code>.env</code> and set <code>MOCK_MODE=false</code> to go live.</p>
+              <Row label="Data mode" value={data.mockMode ? "Sample (no keys required)" : "Live"} />
+              <Row label="Language model" value={providerLabel(data.llmProvider)} />
+              <Row label="Embeddings" value={providerLabel(data.embeddingsProvider)} />
+              <p className="pt-2 text-xs text-muted-foreground">
+                This workspace is running on bundled sample data. Add data-source and model API keys to switch to live results.
+              </p>
             </CardContent>
           </Card>
           <Card>
@@ -95,6 +99,10 @@ export default function SettingsPage() {
       </div>
     </div>
   );
+}
+
+function providerLabel(v: string) {
+  return v === "mock" ? "Sample" : v;
 }
 
 function Row({ label, value }: { label: string; value: string }) {

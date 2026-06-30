@@ -60,10 +60,10 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
           <CardContent>
             <MiniMap points={points} className="h-[460px]" />
             <div className="mt-2 flex gap-3 text-xs text-muted-foreground">
-              <span><span className="mr-1 inline-block h-2 w-2 rounded-full" style={{ background: "#16a34a" }} />High</span>
-              <span><span className="mr-1 inline-block h-2 w-2 rounded-full" style={{ background: "#2563eb" }} />Medium</span>
+              <span><span className="mr-1 inline-block h-2 w-2 rounded-full" style={{ background: "#0E9F6E" }} />High</span>
+              <span><span className="mr-1 inline-block h-2 w-2 rounded-full" style={{ background: "#5B4FE0" }} />Medium</span>
               <span><span className="mr-1 inline-block h-2 w-2 rounded-full" style={{ background: "#94a3b8" }} />Low</span>
-              <span><span className="mr-1 inline-block h-2 w-2 rounded-full" style={{ background: "#dc2626" }} />Avoid</span>
+              <span><span className="mr-1 inline-block h-2 w-2 rounded-full" style={{ background: "#E11D48" }} />Avoid</span>
               <span className="ml-auto">Bubble size = priority score</span>
             </div>
           </CardContent>

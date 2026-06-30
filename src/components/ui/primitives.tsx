@@ -23,12 +23,12 @@ export function CardFooter({ className, ...props }: React.HTMLAttributes<HTMLDiv
 }
 
 const buttonVariants = {
-  default: "bg-primary text-primary-foreground hover:bg-primary/90",
+  default: "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90",
   secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-  outline: "border border-input bg-card hover:bg-accent hover:text-accent-foreground",
+  outline: "border border-input bg-card shadow-sm hover:bg-accent hover:text-accent-foreground hover:border-primary/30",
   ghost: "hover:bg-accent hover:text-accent-foreground",
-  destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-  success: "bg-success text-success-foreground hover:bg-success/90",
+  destructive: "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
+  success: "bg-success text-success-foreground shadow-sm hover:bg-success/90",
 };
 const buttonSizes = {
   default: "h-9 px-4 py-2 text-sm",
@@ -46,7 +46,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     <button
       ref={ref}
       className={cn(
-        "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
+        "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:translate-y-px disabled:pointer-events-none disabled:opacity-50",
         buttonVariants[variant],
         buttonSizes[size],
         className,
@@ -109,6 +109,10 @@ export function Badge({ tone = "default", className, ...props }: React.HTMLAttri
       {...props}
     />
   );
+}
+
+export function Skeleton({ className }: { className?: string }) {
+  return <div className={cn("animate-pulse rounded-md bg-muted", className)} aria-hidden="true" />;
 }
 
 export function Spinner({ className }: { className?: string }) {

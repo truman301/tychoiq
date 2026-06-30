@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, Button, Input, Label, Spinner } from "@/components/ui/primitives";
-import { Target } from "lucide-react";
+import { LogoTile } from "@/components/Logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -35,14 +35,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
+    <div className="flex min-h-screen items-center justify-center bg-starfield px-4">
       <div className="w-full max-w-sm">
-        <div className="mb-6 flex flex-col items-center gap-2">
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <Target className="h-6 w-6" />
-          </span>
-          <h1 className="text-xl font-bold">Welcome to TychoIQ</h1>
-          <p className="text-sm text-muted-foreground">Sign in to your workspace</p>
+        <div className="mb-6 flex flex-col items-center gap-3">
+          <LogoTile className="h-12 w-12" />
+          <div className="text-center">
+            <h1 className="font-display text-xl font-semibold">Welcome to Tycho IQ</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Sign in to your workspace</p>
+          </div>
         </div>
         <Card>
           <CardContent className="p-5">

@@ -2,43 +2,107 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ------------------------------------------------------------------ */
+/*  Tycho IQ — "celestial precision" design tokens                     */
+/*  Named for Tycho Brahe, who built the most precise star catalog     */
+/*  of the pre-telescope era. The product charts prospects with the    */
+/*  same evidence-first precision.                                     */
+/* ------------------------------------------------------------------ */
+
 :root {
-  --background: 210 40% 98%;
-  --foreground: 222 47% 11%;
+  --background: 240 33% 99%;
+  --foreground: 233 39% 11%;
   --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
-  --primary: 221 83% 53%;
+  --card-foreground: 233 39% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 233 39% 11%;
+
+  --primary: 246 73% 59%;            /* Tycho indigo */
   --primary-foreground: 0 0% 100%;
-  --secondary: 210 40% 94%;
-  --secondary-foreground: 222 47% 11%;
-  --muted: 210 40% 96%;
-  --muted-foreground: 215 16% 47%;
-  --accent: 210 40% 92%;
-  --accent-foreground: 222 47% 11%;
-  --destructive: 0 72% 51%;
+  --secondary: 240 27% 95%;
+  --secondary-foreground: 233 33% 22%;
+  --muted: 240 24% 96%;
+  --muted-foreground: 233 12% 45%;
+  --accent: 246 70% 96%;
+  --accent-foreground: 246 55% 40%;
+
+  --destructive: 347 79% 51%;
   --destructive-foreground: 0 0% 100%;
-  --success: 142 71% 38%;
+  --success: 158 68% 37%;
   --success-foreground: 0 0% 100%;
-  --warning: 38 92% 50%;
-  --warning-foreground: 0 0% 100%;
-  --border: 214 32% 88%;
-  --input: 214 32% 88%;
-  --ring: 221 83% 53%;
-  --radius: 0.6rem;
+  --warning: 35 92% 50%;
+  --warning-foreground: 30 60% 16%;
+  --star: 41 96% 56%;                /* gold accent — "stars" */
+
+  --border: 240 22% 90%;
+  --input: 240 22% 89%;
+  --ring: 246 73% 59%;
+  --radius: 0.7rem;
+
+  /* Deep-ink sidebar (night sky) */
+  --sidebar: 235 44% 12%;
+  --sidebar-foreground: 233 28% 80%;
+  --sidebar-muted: 233 16% 60%;
+  --sidebar-border: 233 30% 22%;
+  --sidebar-accent: 235 36% 18%;
 }
 
 * {
   border-color: hsl(var(--border));
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
-  font-feature-settings: "rlig" 1, "calt" 1;
+  font-feature-settings: "calt" 1, "liga" 1, "ss01" 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@layer base {
+  h1, h2, h3, h4 {
+    font-family: var(--font-display), var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: -0.021em;
+  }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
+  .font-display {
+    font-family: var(--font-display), var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  }
+  /* faint starfield/grid used on hero + empty states */
+  .bg-starfield {
+    background-image: radial-gradient(hsl(var(--border)) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+}
+
+::selection {
+  background: hsl(var(--primary) / 0.18);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--border)) transparent;
+}
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 9999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+  background-clip: content-box;
 }

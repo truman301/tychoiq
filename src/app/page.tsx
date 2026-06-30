@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { Landing } from "@/components/Landing";
 import { getSessionContext } from "@/lib/auth";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from "@/components/ui/primitives";
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const ctx = await getSessionContext();
-  if (!ctx) redirect("/login");
+  if (!ctx) return <Landing />;
   const workspace = { id: ctx.workspaceId };
 
   const [projects, activeScans, topCandidates, totalCandidates] = await Promise.all([
@@ -166,16 +166,21 @@ export default async function DashboardPage() {
 
 function EmptyProjects() {
   return (
-    <div className="rounded-md border border-dashed p-8 text-center">
-      <p className="text-sm text-muted-foreground">No projects yet.</p>
-      <Link href="/projects/new" className="mt-3 inline-block">
+    <div className="rounded-lg border border-dashed bg-starfield p-10 text-center">
+      <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+        <FolderPlus className="h-5 w-5" />
+      </div>
+      <p className="text-sm font-medium">No projects yet</p>
+      <p className="mx-auto mt-1 max-w-sm text-xs text-muted-foreground">
+        Create a sourcing project to define an ICP, train the model, and surface evidence-backed prospects.
+      </p>
+      <Link href="/projects/new" className="mt-4 inline-block">
         <Button>
           <FolderPlus className="h-4 w-4" /> Create your first project
         </Button>
       </Link>
       <p className="mx-auto mt-3 max-w-md text-xs text-muted-foreground">
-        Tip: try <strong>Quinable Mode</strong> for a prebuilt healthcare-staffing sourcing template, or seed the demo with{" "}
-        <code className="rounded bg-muted px-1">npm run db:seed</code>.
+        Tip: start with <strong>Quinable Mode</strong> for a ready-made healthcare-staffing template, or build a custom ICP from any of the seven project templates.
       </p>
     </div>
   );

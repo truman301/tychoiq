@@ -223,12 +223,89 @@ const GENERIC_TYPE_TEXT: Record<string, string> = {
   "independent operator": "is a founder-owned independent operator with recurring revenue.",
 };
 
+// Realistic name parts so generated demo orgs don't read as "Fairview Assisted
+// Living 3". Deterministic — the index drives every choice.
+const NAME_PREFIXES = [
+  "Cedar Ridge", "Hillcrest", "Maplewood", "Riverstone", "Oakhaven", "Lakeview",
+  "Stonebridge", "Birchwood", "Brookside", "Summit", "Willow Creek", "Sterling",
+  "Heritage", "Bayshore", "Highland", "Crestview", "Pinegrove", "Meadowbrook",
+  "Northgate", "Silver Lake", "Greenfield", "Ironwood", "Harborview", "Clearwater",
+  "Whitman", "Carriage Hill", "Fox Hollow", "Prairie Rose", "Evergreen Park", "Auburn",
+];
+
+const HEALTH_SUFFIX: Record<string, string[]> = {
+  "skilled nursing facility": ["Skilled Nursing & Rehabilitation", "Health & Rehabilitation Center", "Care Center"],
+  "nursing home": ["Nursing & Rehabilitation Center", "Care Center", "Healthcare Center"],
+  "assisted living": ["Assisted Living", "Senior Living", "Assisted Living & Memory Care"],
+  "memory care": ["Memory Care", "Memory Care Community"],
+  "rehab facility": ["Rehabilitation Center", "Post-Acute & Rehabilitation"],
+  "home health agency": ["Home Health", "Home Health & Hospice", "Home Care Services"],
+  "hospice agency": ["Hospice & Palliative Care", "Hospice Care"],
+  "senior living community": ["Senior Living Community", "Retirement Community"],
+};
+
+const BUSINESS_SUFFIX: Record<string, string[]> = {
+  company: ["Group", "Holdings", "Partners"],
+  "local service business": ["Services", "Service Co.", "Contractors"],
+  manufacturer: ["Manufacturing", "Industries", "Fabrication"],
+  distributor: ["Distribution", "Supply Co.", "Logistics"],
+  "independent operator": ["Holdings", "Group", "Enterprises"],
+  "regional service business": ["Services Group", "Regional Services"],
+  "industrial services": ["Industrial Services", "Industrial Group"],
+};
+
+function isHealthType(type: string): boolean {
+  return /nursing|assisted|memory|rehab|home health|hospice|senior|skilled/i.test(type);
+}
+
+function pick<T>(arr: T[], i: number): T {
+  return arr[((i % arr.length) + arr.length) % arr.length];
+}
+
 function makeGenericOrg(type: string, state: string, idx: number): Omit<MockOrg, "lat" | "lng"> {
-  const cityList = ["Springfield", "Riverside", "Fairview", "Madison", "Georgetown", "Clinton"];
-  const city = cityList[idx % cityList.length];
-  const name = `${city} ${titleType(type)} ${idx + 1}`;
+  const cityList = ["Springfield", "Riverside", "Fairview", "Madison", "Georgetown", "Clinton", "Franklin", "Arlington"];
+  const city = pick(cityList, idx);
+  const prefix = pick(NAME_PREFIXES, idx);
+  const health = isHealthType(type);
+  const suffixPool = (health ? HEALTH_SUFFIX[type] : BUSINESS_SUFFIX[type]) ?? [titleType(type)];
+  const suffix = pick(suffixPool, Math.floor(idx / NAME_PREFIXES.length) + (idx % 3));
+  const name = `${prefix} ${suffix}`;
   const domain = `${slugify(name)}.example.com`;
-  const hiring = idx % 2 === 0 ? "We are now hiring and expanding our team." : "";
+
+  // Deterministic variation buckets so fit AND risk genuinely differentiate
+  // across the generated set (instead of every candidate scoring risk 0).
+  const bucket = idx % 12;
+  const starRating = health ? pick([4, 3, 5, 4, 2, 3, 4, 1, 3, 4, 5, 2], bucket) : undefined;
+  const bedCount = health ? 40 + ((idx * 13) % 130) : undefined;
+  const facilityCount = (idx % 5) + 1;
+  const hiring = bucket % 2 === 0;
+
+  const qualityBits =
+    health && (starRating ?? 0) >= 4
+      ? "Medicare certified and accredited, with a strong infection control and compliance program. Our locations share a leadership team focused on quality."
+      : health
+        ? "Licensed community providing resident care."
+        : "";
+  const painBits = health && hiring
+    ? "We are now hiring CNAs, LPNs and RNs and need weekend coverage and call-off support; help us reduce agency staffing."
+    : "";
+  const businessHiring = !health && hiring ? "We are now hiring and expanding our team." : "";
+
+  // Risk language for a deterministic subset (feeds the risk engine via the
+  // signal extractor — same path the named "Troubled Pines" org uses).
+  let riskNews: string | undefined;
+  if (bucket === 7) {
+    riskNews = `Court filings indicate ${name} entered receivership amid a payment dispute and an unpaid collections lawsuit.`;
+  } else if (bucket === 4) {
+    riskNews = `${name} was cited for immediate jeopardy and received a civil monetary penalty; it was placed on the special focus facility list.`;
+  } else if (bucket === 10) {
+    riskNews = `Following a change of ownership, ${name} announced one location ceased operations this year.`;
+  }
+
+  const marketingText = health
+    ? `${name} is a ${type} serving ${city}, ${state}. ${qualityBits} ${painBits}`.replace(/\s+/g, " ").trim()
+    : `${name} ${GENERIC_TYPE_TEXT[type] ?? "is an organization matching the target profile."} ${businessHiring}`.replace(/\s+/g, " ").trim();
+
   return {
     id: slugify(name),
     name,
@@ -239,9 +316,18 @@ function makeGenericOrg(type: string, state: string, idx: number): Omit<MockOrg,
     city,
     state,
     postalCode: `${10000 + idx * 7}`.slice(0, 5),
-    facilityCount: (idx % 3) + 1,
-    marketingText: `${name} ${GENERIC_TYPE_TEXT[type] ?? "is an organization matching the target profile."} ${hiring}`,
-    careersText: hiring ? "Careers: open positions available. Apply now." : undefined,
+    bedCount,
+    starRating,
+    facilityCount,
+    marketingText,
+    careersText: health
+      ? hiring
+        ? "Careers: now hiring CNAs, LPNs and RNs. Weekend and call-off coverage available. Apply now."
+        : undefined
+      : businessHiring
+        ? "Careers: open positions available. Apply now."
+        : undefined,
+    newsText: riskNews,
   };
 }
 

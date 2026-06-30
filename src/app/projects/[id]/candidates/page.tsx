@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { api, LABEL_LABELS } from "@/lib/client";
 import type { SerializedCandidate } from "@/lib/candidateView";
-import { Card, CardContent, Button, Input, Badge, Spinner } from "@/components/ui/primitives";
+import { Card, CardContent, Button, Input, Badge, Spinner, Skeleton } from "@/components/ui/primitives";
 import { TierBadge, ConfidenceDot } from "@/components/score";
 import { LABEL_VALUES } from "@/lib/types";
 import { Download, Upload, Tag } from "lucide-react";
@@ -21,6 +21,8 @@ export default function CandidatesPage({ params }: { params: Promise<{ id: strin
   const [importText, setImportText] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const pageSize = 25;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -32,6 +34,10 @@ export default function CandidatesPage({ params }: { params: Promise<{ id: strin
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filters]);
 
   const filtered = useMemo(() => {
     return candidates.filter((c) => {
@@ -104,6 +110,12 @@ export default function CandidatesPage({ params }: { params: Promise<{ id: strin
     }
   }
 
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const current = Math.min(page, pageCount);
+  const visible = filtered.slice((current - 1) * pageSize, current * pageSize);
+  const rangeStart = filtered.length === 0 ? 0 : (current - 1) * pageSize + 1;
+  const rangeEnd = Math.min(current * pageSize, filtered.length);
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -167,8 +179,16 @@ export default function CandidatesPage({ params }: { params: Promise<{ id: strin
       <Card>
         <CardContent className="p-0">
           {loading ? (
-            <div className="p-8 text-center">
-              <Spinner />
+            <div className="space-y-3 p-4">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <Skeleton className="h-4 w-4" />
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="ml-auto h-4 w-10" />
+                  <Skeleton className="h-5 w-20 rounded-full" />
+                </div>
+              ))}
             </div>
           ) : filtered.length === 0 ? (
             <div className="p-8 text-center text-sm text-muted-foreground">No candidates. Run a scan or import a list.</div>
@@ -192,7 +212,7 @@ export default function CandidatesPage({ params }: { params: Promise<{ id: strin
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((c) => {
+                  {visible.map((c) => {
                     const loc = (c.locations ?? [])[0];
                     return (
                       <tr key={c.id} className="border-b last:border-0 hover:bg-accent/40">
@@ -225,7 +245,25 @@ export default function CandidatesPage({ params }: { params: Promise<{ id: strin
           )}
         </CardContent>
       </Card>
-      <p className="text-xs text-muted-foreground">{filtered.length} of {candidates.length} candidates</p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-muted-foreground">
+          {filtered.length === 0 ? "No candidates" : `Showing ${rangeStart}–${rangeEnd} of ${filtered.length}`}
+          {filtered.length !== candidates.length ? ` (filtered from ${candidates.length})` : ""}
+        </p>
+        {pageCount > 1 && (
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={current <= 1}>
+              Previous
+            </Button>
+            <span className="text-xs tabular-nums text-muted-foreground">
+              Page {current} of {pageCount}
+            </span>
+            <Button size="sm" variant="outline" onClick={() => setPage((p) => Math.min(pageCount, p + 1))} disabled={current >= pageCount}>
+              Next
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
