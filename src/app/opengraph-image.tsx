@@ -1,5 +1,10 @@
 import { ImageResponse } from "next/og";
 
+// Run on the edge runtime: avoids the Node build of @vercel/og (which throws
+// "Invalid URL" via fileURLToPath during static prerender) and generates the
+// card on demand instead of at build time.
+export const runtime = "edge";
+
 export const alt = "Tycho IQ — AI-trained, evidence-first prospect discovery";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
